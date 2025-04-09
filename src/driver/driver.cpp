@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
-
+#include <cuda_runtime.h>
+#include "fluid_kernels.h"
 
 /*
 Overall Todos:
@@ -90,7 +91,10 @@ struct MouseState{
 };
 
 global_variable MouseState GlobalMouse = {};
-  
+
+static float* dDensity = nullptr;
+static float* dPriorDensity = nullptr;
+
 struct win32_window_dimension{
   int Width;
   int Height;
@@ -123,6 +127,12 @@ internal void NSSimulationInit(){
       }      
     }
   }
+
+  cudaMalloc((void**)&dDensity, ArraySize);
+  cudaMalloc((void**)&dPriorDensity, ArraySize);
+  
+  cudaMemset(dDensity, 0, ArraySize);
+  cudaMemset(dPriorDensity, 0, ArraySize);
 }
 
 
@@ -166,6 +176,7 @@ internal void NSBound(int Mode, real32* Array){
 } 
 
 
+/* 
 // Diffusion step: simulating diffusion of density / velocity 
 internal void NSDiffuse(int32 Mode, real32* DiffusionTarget, real32* TargetPrior){
   // Gauss-Seidel Relaxation (20 passes): 
@@ -186,6 +197,37 @@ internal void NSDiffuse(int32 Mode, real32* DiffusionTarget, real32* TargetPrior
     NSBound(Mode, DiffusionTarget);
   }
 }
+*/
+internal void NSDiffuse(int32 Mode, real32* DiffusionTarget, real32* TargetPrior)
+{
+    real32 DiffusionConstant = GlobalDiffusionRate * GlobalBaseDeltaTime;
+
+    // 1) Copy host -> device
+    size_t ArraySize = sizeof(float) * (SimulationWidth + 2) * (SimulationHeight + 2);
+
+    // If you're diffusing 'Density', dDensity & dPriorDensity are your global device pointers
+    cudaMemcpy(dPriorDensity, TargetPrior,       ArraySize, cudaMemcpyHostToDevice);
+    cudaMemcpy(dDensity,      DiffusionTarget,   ArraySize, cudaMemcpyHostToDevice);
+
+    // 2) Launch the GPU-based Gauss-Seidel solve
+    NSDiffuse_GPU(
+        Mode,
+        dDensity,
+        dPriorDensity,
+        DiffusionConstant,
+        SimulationWidth,
+        SimulationHeight,
+        20  // Gauss-Seidel iterations
+    );
+
+    // 3) Copy device -> host
+    cudaMemcpy(DiffusionTarget, dDensity, ArraySize, cudaMemcpyDeviceToHost);
+
+    // 4) Run boundary on CPU (or do it on GPU if you prefer):
+    NSBound(Mode, DiffusionTarget);
+}
+
+
 
 // Advection step: follow defined velocities
 internal void NSAdvect(int32 Mode, real32* AdvectionTarget, real32* TargetPrior){
