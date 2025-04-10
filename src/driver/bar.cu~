@@ -1,6 +1,3 @@
-#include <cuda_runtime.h>
-#include "fluid_kernels.h"
-
 __global__ void DiffuseKernel(
     float* DiffusionTarget,
     const float* TargetPrior,
@@ -25,35 +22,4 @@ __global__ void DiffuseKernel(
             )
         ) / (1.f + 4.f * DiffusionConstant);
     }
-}
-
-extern "C"
-void NSDiffuseGPU(
-    int Mode,
-    float* d_DiffusionTarget,
-    float* d_TargetPrior,
-    float DiffusionConstant,
-    int SimulationWidth,
-    int SimulationHeight,
-    int GaussSeidelIterations
-)
-{
-    dim3 blockSize(16, 16);
-    dim3 gridSize(
-        (SimulationWidth + blockSize.x) / blockSize.x,
-        (SimulationHeight + blockSize.y) / blockSize.y
-    );
-
-    for(int iter = 0; iter < GaussSeidelIterations; ++iter)
-    {
-        DiffuseKernel<<<gridSize, blockSize>>>(
-            d_DiffusionTarget,
-            d_TargetPrior,
-            DiffusionConstant,
-            SimulationWidth,
-            SimulationHeight
-        );
-        
-    }
-   
 }

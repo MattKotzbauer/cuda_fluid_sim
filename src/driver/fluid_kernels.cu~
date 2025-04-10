@@ -1,5 +1,5 @@
-#include <cuda_runtime.h>
-#include "fluid_kernels.h"
+// #include <cuda_runtime.h>
+// #include "fluid_kernels.h"
 
 __global__ void DiffuseKernel(
     float* DiffusionTarget,
@@ -28,7 +28,7 @@ __global__ void DiffuseKernel(
 }
 
 extern "C"
-void NSDiffuseGPU(
+void NSDiffuse_GPU(
     int Mode,
     float* d_DiffusionTarget,
     float* d_TargetPrior,
@@ -55,5 +55,5 @@ void NSDiffuseGPU(
         );
         
     }
-   
+
 }

@@ -1,7 +1,18 @@
 @echo off
 
+:: Create the bin/ folder if it doesn't already exist.
 mkdir ..\..\bin
 pushd ..\..\bin
-cl -FC -Zi /std:c++17 ..\src\driver\driver.cpp user32.lib Gdi32.lib
-popd
 
+:: 1) Compile fluid_kernels.cu, targeting sm_86
+nvcc -arch=sm_86 -c -o fluid_kernels.obj ..\src\driver\fluid_kernels.cu ^
+     --compiler-options /std:c++17
+
+:: 2) Compile driver.cu (formerly driver.cpp), also targeting sm_86
+nvcc -arch=sm_86 -c -o driver.obj ..\src\driver\driver.cu ^
+     --compiler-options /std:c++17
+
+:: 3) Link all objects into an .exe, pulling in user32.lib and gdi32.lib
+nvcc -arch=sm_86 -o fluid_sim.exe driver.obj fluid_kernels.obj user32.lib Gdi32.lib
+
+popd
